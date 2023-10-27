@@ -634,7 +634,7 @@ end if
                              W_d, S_d, size_1_species, gpu_stream)
 
 
-    call cpy_htod(c_loc(soap), soap_d, st_soap, gpu_stream)
+    ! call cpy_htod(c_loc(soap), soap_d, st_soap, gpu_stream)
 
 ! 12.6 s
   !call cpu_time(ttt(1)) 
