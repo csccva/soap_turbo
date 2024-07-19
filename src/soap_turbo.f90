@@ -40,12 +40,15 @@ module soap_turbo_desc
                       atom_sigma_r_scaling_d, atom_sigma_t_d, atom_sigma_t_scaling_d, &
                       amplitude_scaling_d, radial_enhancement, central_weight_d, central_weight, basis, scaling_mode, do_timing, &
                       do_derivatives, compress_soap, compress_soap_indices, soap, soap_cart_der, time_get_soap, &
-                      soap_d,  soap_cart_der_d, n_neigh_d, k2_i_site_d,cublas_handle , gpu_stream)
+                      soap_d,  soap_cart_der_d, n_neigh_d, k2_i_site_d,cublas_handle , gpu_stream, &
+                      time_misca,time_get_rad, time_get_ang, time_get_cart)
 
   implicit none
 
 !-------------------
 ! Input variables
+  real*8, intent(inout) :: time_misca,time_get_rad, time_get_ang, time_get_cart
+  real*8 :: tt_misca(2)=0.0,tt_rad(2)=0.0,tt_ang(2)=0.0,tt_cart(2)=0.0
   real(c_double), intent(in), target :: rjs(:), thetas(:), phis(:)
 ! real(c_double), intent(in), target :: amplitude_scaling(:), atom_sigma_r_scaling(:), atom_sigma_t(:), atom_sigma_t_scaling(:)
 ! real(c_double), intent(in), target :: amplitude_scaling(:), atom_sigma_t(:), atom_sigma_t_scaling(:)
@@ -151,6 +154,10 @@ module soap_turbo_desc
   integer(c_size_t) :: st_size_amplitudes, st_size_exp_coeff_temp,st_size_alphamax
 !-------------------
 
+  
+  
+  ! call gpu_device_sync()
+  ttt(1)=MPI_Wtime() 
 
   st_soap=sizeof(soap) !n_soap*n_sites*sizeof(soap(1,1))
   call gpu_malloc_all(soap_d, st_soap, gpu_stream)
@@ -317,15 +324,14 @@ module soap_turbo_desc
     end do
     call gpu_free_async(S_d_work,gpu_stream)
     call gpu_free_async(W_d_work,gpu_stream)
-  end if
+  end if 
 
 
-  ttt(1)=MPI_Wtime() 
   size_tmp_var = n_max*n_max*c_double
-  call cpy_htod_blocking(c_loc(S),S_d,size_tmp_var)
-  call cpy_htod_blocking(c_loc(W),W_d,size_tmp_var)
-  ! call cpy_htod(c_loc(S),S_d,size_tmp_var,gpu_stream)
-  ! call cpy_htod(c_loc(W),W_d,size_tmp_var,gpu_stream)
+  ! call cpy_htod_blocking(c_loc(S),S_d,size_tmp_var)
+  ! call cpy_htod_blocking(c_loc(W),W_d,size_tmp_var)
+  call cpy_htod(c_loc(S),S_d,size_tmp_var,gpu_stream)
+  call cpy_htod(c_loc(W),W_d,size_tmp_var,gpu_stream)
   ! allocate( W_check(1:n_max, 1:n_max) )
   ! allocate( S_check(1:n_max, 1:n_max) )
   ! size_tmp_var = n_max*n_max*c_double
@@ -383,7 +389,7 @@ module soap_turbo_desc
     end if
   else
     n_soap = n_max*(n_max+1)/2 * (l_max+1)
-  end if
+  end if 
 
   if( do_timing )then
     call cpu_time(time1)
@@ -398,7 +404,7 @@ module soap_turbo_desc
   st_n_atom_pairs_double=n_atom_pairs*sizeof(thetas(1))
   st_skip_component=sizeof(skip_soap_component)
 
-  sqrt_dot_p = 0.d0
+  ! sqrt_dot_p = 0.d0
   if( do_derivatives )then
     allocate( radial_exp_coeff_der(1:n_max, 1:n_atom_pairs) )
     allocate( angular_exp_coeff_rad_der(1:k_max, 1:n_atom_pairs) )
@@ -410,21 +416,22 @@ module soap_turbo_desc
     allocate( soap_rad_der(1:n_soap, 1:n_atom_pairs) )
     allocate( soap_azi_der(1:n_soap, 1:n_atom_pairs) )
     allocate( soap_pol_der(1:n_soap, 1:n_atom_pairs) )
-    radial_exp_coeff_der = 0.d0
-    angular_exp_coeff_rad_der = 0.d0
-    angular_exp_coeff_azi_der = 0.d0
-    angular_exp_coeff_pol_der = 0.d0
-    cnk_rad_der = 0.d0
-    soap_rad_der = 0.d0
-    cnk_azi_der = 0.d0
-    soap_azi_der = 0.d0
-    cnk_pol_der = 0.d0
-    soap_pol_der = 0.d0
+    ! radial_exp_coeff_der = 0.d0
+    ! angular_exp_coeff_rad_der = 0.d0
+    ! angular_exp_coeff_azi_der = 0.d0
+    ! angular_exp_coeff_pol_der = 0.d0
+    ! cnk_rad_der = 0.d0
+    ! soap_rad_der = 0.d0
+    ! cnk_azi_der = 0.d0
+    ! soap_azi_der = 0.d0
+    ! cnk_pol_der = 0.d0
+    ! soap_pol_der = 0.d0
   else
 !   We need this dummy variable defined here. Note the decreased range for the second index
     allocate( radial_exp_coeff_der(1:n_max, 1:1) )
   end if
 
+  
   !write(*,*) n_sites, n_atom_pairs
   if( do_timing )then
     call cpu_time(time2)
@@ -531,6 +538,9 @@ module soap_turbo_desc
   call gpu_malloc_all(n_neigh_d,st_n_sites_int,gpu_stream)
   call cpy_htod(c_loc(n_neigh),n_neigh_d, st_n_sites_int,gpu_stream)
 
+  !call gpu_device_sync()
+  !tt_rad(1)=MPI_Wtime()
+
   mode = 0
   if( scaling_mode == "polynomial" ) mode =1
   if( basis == "poly3gauss" )then
@@ -559,7 +569,7 @@ module soap_turbo_desc
 !                                                  radial_exp_coeff(i_beg(i):i_end(i), :), &
 !                                                  radial_exp_coeff_der(i_beg(i):i_end(i), :) )
   end if
-  
+
   ! do kij=1,n_atom_pairs
   ! do n=1,n_max
   ! if(isnan(radial_exp_coeff(n,kij))) then
@@ -573,6 +583,10 @@ module soap_turbo_desc
   allocate(k2_i_site(1:n_atom_pairs))
   !write(*,*) "N atom pairs", n_atom_pairs
   allocate(k2_start(1:n_sites))
+
+  ! call gpu_device_sync()
+  ! tt_rad(2)=MPI_Wtime()
+  ! time_get_rad=time_get_rad+tt_rad(2)-tt_rad(1)
   
   k2 = 0
   do i = 1, n_sites
@@ -582,6 +596,9 @@ module soap_turbo_desc
       k2_i_site(k2)=i
     enddo
   enddo
+   
+  
+  !call gpu_malloc_all_blocking(k2_start_d,st_n_sites_int) !
   call gpu_malloc_all(k2_start_d,st_n_sites_int,gpu_stream)
   call cpy_htod(c_loc(k2_start), k2_start_d, st_n_sites_int, gpu_stream)
 
@@ -743,7 +760,8 @@ module soap_turbo_desc
     call cpu_time(time1)
   end if
  
-
+  
+  
   st_cnk=k_max*n_max*n_sites*sizeof(cnk(1,1,1))
 
   call gpu_malloc_all(cnk_d,st_cnk,gpu_stream) ! call gpu_malloc_double_complex(cnk_d, k_max*n_max*n_sites)
@@ -770,6 +788,7 @@ module soap_turbo_desc
 ! call gpu_malloc_all(central_weight_d,st_size_central_weight,gpu_stream)
 ! call cpy_htod(c_loc(central_weight),central_weight_d,st_size_central_weight, gpu_stream)
 
+
   call gpu_get_cnk(radial_exp_coeff_d, angular_exp_coeff_d, &
                              cnk_d, &
                              n_neigh_d, k2_start_d, &
@@ -789,6 +808,7 @@ module soap_turbo_desc
 
 ! Do derivatives
   if( do_derivatives )then
+
 
   pi = dacos(-1.d0)
     
@@ -815,7 +835,8 @@ module soap_turbo_desc
     coeff_time = time2 - time1
   end if
 
-
+  ! call gpu_device_sync()
+  ! tt_misca(1)=MPI_Wtime()
 
 
 ! 7.5 s 
@@ -877,6 +898,9 @@ module soap_turbo_desc
   call cpy_htod(c_loc(skip_soap_component), skip_soap_component_d, st_skip_component,gpu_stream)
   
   
+  ! call gpu_device_sync()
+  ! tt_misca(2)=MPI_Wtime() 
+  ! time_misca=time_misca+tt_misca(2)-tt_misca(1)
   call gpu_get_sqrt_dot_p(sqrt_dot_p_d, soap_d, multiplicity_array_d, &
                                     cnk_d, skip_soap_component_d,  &
                                     n_sites, n_soap, n_max,l_max, gpu_stream)

@@ -425,6 +425,7 @@ module soap_turbo_angular
     type(c_ptr) :: plm_array_div_sin_d, plm_array_der_mul_sin_d
     integer(c_size_t) :: st_prefl_array_global, st_plm_array_global,  st_eimphi_global, st_plm_array_der_global
     type(c_ptr), intent(inout) :: gpu_stream
+
     
     c_do_derivatives=logical( .false., kind=c_bool ) 
     if(do_derivatives) then 
