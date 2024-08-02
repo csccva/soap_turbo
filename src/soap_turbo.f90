@@ -98,7 +98,7 @@ module soap_turbo_desc
   integer :: k_max, n_max
   integer :: i, counter, j, k, n_soap, k2, k3, n, l, m, np, counter2
   logical(c_bool), allocatable, target :: skip_soap_component(:,:,:)
-  logical, allocatable :: do_central(:)
+  logical(c_bool), allocatable,target :: do_central(:)
   logical, save :: recompute_basis = .true.
   integer(c_int) :: rank, ierr, n_multiplicity
   type(c_ptr) :: i_beg_d, i_end_d, preflm_d, plm_array_d, eimphi_d, prefm_d
@@ -154,7 +154,7 @@ module soap_turbo_desc
   integer(c_size_t) :: st_size_amplitudes, st_size_exp_coeff_temp,st_size_alphamax
 !-------------------
 
-  
+ !$omp threadprivate(W, S, multiplicity_array,n_max_prev, recompute_basis, W_d, S_d, W_S_initialized)
   
   ! call gpu_device_sync()
   ttt(1)=MPI_Wtime() 
@@ -270,7 +270,7 @@ module soap_turbo_desc
   end if
   !W and S array are actually never deallocated in the original code! and it use weird "save" semantic to keep allocation between iteration, but never takes care to free the memory.
   !will try to have them on the device only as they don't seem to be used on the host side now.
-
+  
   if( recompute_basis )then
     if( W_S_initialized )then
       call gpu_free_async(W_d,gpu_stream)
@@ -289,11 +289,11 @@ module soap_turbo_desc
     call gpu_malloc_all(S_d,size_tmp_var, gpu_stream)
     tmp_cint_val = 0
 !    write(0,*) tmp_cint_val
-    call gpu_memset_async(S_d,tmp_cint_val,size_tmp_var, gpu_stream)
+    call gpu_memset_async(S_d,0,size_tmp_var, gpu_stream)
     call gpu_memset_async(W_d,0,size_tmp_var, gpu_stream)
-    size_tmp_var = maxval(alpha_max)*maxval(alpha_max)*c_double
-    call gpu_malloc_all(W_d_work,size_tmp_var, gpu_stream)
-    call gpu_malloc_all(S_d_work,size_tmp_var, gpu_stream)
+    ! size_tmp_var = maxval(alpha_max)*maxval(alpha_max)*c_double
+    ! call gpu_malloc_all(W_d_work,size_tmp_var, gpu_stream)
+    ! call gpu_malloc_all(S_d_work,size_tmp_var, gpu_stream)
 !   This is done per species. Each loop iteration modifies the slice of the W and S matrices that
 !   corresponds to the species in question. The radial basis functions for species A are always
 !   assumed orthogonal to the basis functions for species B. W and S are therefore block diagonal.
@@ -322,8 +322,8 @@ module soap_turbo_desc
 !        write(0,*) "second calling done"
 !      deallocate( S_temp, W_temp )
     end do
-    call gpu_free_async(S_d_work,gpu_stream)
-    call gpu_free_async(W_d_work,gpu_stream)
+    ! call gpu_free_async(S_d_work,gpu_stream)
+    ! call gpu_free_async(W_d_work,gpu_stream)
   end if 
 
 
@@ -1083,10 +1083,10 @@ module soap_turbo_desc
   call gpu_free_async(multiplicity_array_d,gpu_stream)
   call gpu_free_async(skip_soap_component_d,gpu_stream)
   call gpu_free_async(sqrt_dot_p_d,gpu_stream)
+  call gpu_free_async(do_central_d,gpu_stream)
 ! call gpu_free_async(central_weight_d,gpu_stream)
 !  call gpu_free_async(global_scaling_d,gpu_stream)
-  !call gpu_free_async(cnk_d,gpu_stream)
-  call gpu_free(cnk_d)
+  call gpu_free_async(cnk_d,gpu_stream) ! call gpu_free(cnk_d)
   
   !call cpu_time(ttt(2))
   ttt(2)=MPI_Wtime()
